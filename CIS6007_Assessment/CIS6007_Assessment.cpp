@@ -1,20 +1,65 @@
-// CIS6007_Assessment.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
 
 #include <iostream>
+#include <opencv2/opencv.hpp>
 
-int main()
-{
-    std::cout << "Hello World!\n";
+using namespace std;
+using namespace cv;
+
+Mat convert_to_grayscale(const Mat& rgb) {
+
+    Mat gray_image(rgb.size().height, rgb.size().width, CV_8UC1, Scalar(0));
+
+    for (int y = 0; y < rgb.size().width; y++) {
+        for (int x = 0; x < rgb.size().height; x++) {
+
+            Vec3b bgrpixle = rgb.at<Vec3b>(x, y);
+
+            uchar gray_value = (uchar)(0.114 * bgrpixle[0] + 0.587 * bgrpixle[1] + 0.299 * bgrpixle[2]);
+
+            gray_image.at<uchar>(x, y) = gray_value;
+        }
+    }
+
+    return gray_image;
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
+void convert_to_grauscale_serial(unsigned char* input, unsigned char* output, int start, int end, int nchannels) {
 
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+    auto j = start;
+    auto number_of_pixles = end;
+
+    for (auto i = 0; i < number_of_pixles; i += nchannels) {
+        int value_b = input[0];
+        int value_g = input[i + 1];
+        int value_r = input[i + 2];
+
+        output[j++] = (int)(0.114 * value_b + 0.587 * value_g + 0.299 * value_r);
+    }
+}
+
+int main(int argc, char** argv)
+{
+    string img = "C:\\Users\\rohan\\Downloads\\pic\\small-resolution.jpg";
+    Mat srcImage = imread(img);
+    if (!srcImage.data) {
+        return 1;
+    }
+
+    unsigned char* input = (unsigned char*)srcImage.data;
+
+    int imgSize = srcImage.size().width * srcImage.size().height;
+
+    unsigned char* output = new unsigned char[imgSize];
+
+    convert_to_grauscale_serial(input, output, 0, imgSize * srcImage.channels(), srcImage.channels());
+
+    Mat gray_img = Mat(srcImage.size().height, srcImage.size().width, CV_8UC1, (unsigned*)output);
+
+    namedWindow("srcImg", 1);
+    namedWindow("grayImg", 1);
+
+    imshow("srcImg", srcImage);
+    imshow("grayImg", gray_img);
+    waitKey(0);
+    return 0;
+}
