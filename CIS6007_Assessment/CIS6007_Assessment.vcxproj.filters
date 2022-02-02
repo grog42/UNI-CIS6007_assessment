@@ -18,5 +18,13 @@
     <ClCompile Include="CIS6007_Assessment.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KNNClassifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="KNNClassifier.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

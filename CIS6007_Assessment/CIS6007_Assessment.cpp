@@ -2,6 +2,8 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
+#include "KNNClassifier.h"
+
 using namespace std;
 using namespace cv;
 
@@ -39,27 +41,7 @@ void convert_to_grauscale_serial(unsigned char* input, unsigned char* output, in
 
 int main(int argc, char** argv)
 {
-    string img = "C:\\Users\\rohan\\Downloads\\pic\\small-resolution.jpg";
-    Mat srcImage = imread(img);
-    if (!srcImage.data) {
-        return 1;
-    }
+    KNNClassifier classifier = KNNClassifier();
 
-    unsigned char* input = (unsigned char*)srcImage.data;
-
-    int imgSize = srcImage.size().width * srcImage.size().height;
-
-    unsigned char* output = new unsigned char[imgSize];
-
-    convert_to_grauscale_serial(input, output, 0, imgSize * srcImage.channels(), srcImage.channels());
-
-    Mat gray_img = Mat(srcImage.size().height, srcImage.size().width, CV_8UC1, (unsigned*)output);
-
-    namedWindow("srcImg", 1);
-    namedWindow("grayImg", 1);
-
-    imshow("srcImg", srcImage);
-    imshow("grayImg", gray_img);
-    waitKey(0);
-    return 0;
+    classifier.GetImageNum();
 }
