@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <tuple>
 
+#include "KNNImage.h"
+
 using namespace std;
 using namespace cv;
 using std::filesystem::directory_iterator;
@@ -16,7 +18,10 @@ class KNNClassifier
 
 	const string IMAGES_FOLDER_PATH = "E:\\Documents\\WorkSpace\\CIS6007_Assessment\\images\\";
 
-	vector<tuple<Mat, string>> images;
+	/*
+	* Vector stores path of image and assosiated label
+	*/
+	vector<tuple<KNNImage, string>> images;
 
 	mutex mu;
 
@@ -26,15 +31,21 @@ public:
 		LoadTrainData();
 	}
 
-	const int GetImageNum() { return images.size(); }
-
 	void LoadTrainData() {
 
 		for (const auto& folderName : directory_iterator(IMAGES_FOLDER_PATH + "train")) {
 
+			string folderPath = folderName.path().u8string();
+			int trimLength = IMAGES_FOLDER_PATH.size() + 6;
+			string imgLable = folderPath.erase(0, trimLength);
+
 			for (const auto& imageName : directory_iterator(folderName.path())) {
 
-				cout << imageName;
+				const string imgPath = imageName.path().u8string();
+
+				cout << imgLable << endl;
+
+				images.push_back(tuple<KNNImage, string>(imread(imgPath), imgLable));
 			}
 		}
 	}

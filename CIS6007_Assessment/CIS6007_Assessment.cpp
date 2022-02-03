@@ -42,6 +42,4 @@ void convert_to_grauscale_serial(unsigned char* input, unsigned char* output, in
 int main(int argc, char** argv)
 {
     KNNClassifier classifier = KNNClassifier();
-
-    classifier.GetImageNum();
 }
