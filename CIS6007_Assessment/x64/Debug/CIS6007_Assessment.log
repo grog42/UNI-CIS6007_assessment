@@ -1,10 +1,8 @@
 ﻿  CIS6007_Assessment.cpp
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(53,20): warning C4244: 'return': conversion from 'double' to 'float', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(34,26): warning C4267: 'return': conversion from 'size_t' to 'const int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(41,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(43,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(95,14): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
   KNNClassifier.cpp
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(53,20): warning C4244: 'return': conversion from 'double' to 'float', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(34,26): warning C4267: 'return': conversion from 'size_t' to 'const int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(41,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(43,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(95,14): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
   Generating Code...
   CIS6007_Assessment.vcxproj -> E:\Documents\WorkSpace\CIS6007_Assessment\x64\Debug\CIS6007_Assessment.exe
