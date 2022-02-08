@@ -41,13 +41,24 @@ void convert_to_grauscale_serial(unsigned char* input, unsigned char* output, in
 
 int main(int argc, char** argv)
 {
-    KNNClassifier classifier = KNNClassifier(100, 100);
+    KNNClassifier classifier = KNNClassifier(1000, 1000);
 
     Mat testImage = imread("E:\\Documents\\WorkSpace\\CIS6007_Assessment\\images\\test\\apple\\Image_1.jpg");
+
+    if (!testImage.data) {
+        return 1;
+    }
+
+    //imshow("Base", testImage);
+
+    //imshow("New", KNNImage(testImage, 700, 700));
 
     cout << "Class is:" << endl;
     string lable =  classifier.Classify(testImage, 10);
     cout << lable;
+
+    waitKey(0); 
+
 
     return 0;
 }

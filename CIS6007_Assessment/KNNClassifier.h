@@ -62,9 +62,9 @@ public:
 		}
 	}
 
-	string Classify(const Mat& _img, int k) {
+	string Classify(const Mat& inputImg, int k) {
 
-		KNNImage img(_img, imageWidth, imageHeight);
+		KNNImage img(inputImg, imageWidth, imageHeight);
 
 		vector<tuple<double, string>> distMap = vector<tuple<double, string>>(images.size());
 

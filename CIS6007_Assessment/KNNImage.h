@@ -3,9 +3,13 @@
 #include <math.h>
 #include <stdexcept>
 #include <opencv2/opencv.hpp>
+#include <execution>
+#include <chrono>
+#include <omp.h>
 
 using namespace std;
 using namespace cv;
+using namespace std::chrono;
 
 /*
 * A class which adds functionalty to the opencv Mat class
@@ -22,29 +26,70 @@ public:
     * If constructed using an exsisting image, the image is converted to grayscale and scaled
     * This pre processing of the image makes it usable by the KNN algorythm
     */
-	KNNImage(const Mat& img, int _width, int _height) : width(_width), height(_height), Mat(_height, _width, CV_8UC1, Scalar(0)) {
-		
-        double newImgScaleX = width / (double)img.size().width;
-        double newImgScaleY = height / (double)img.size().height;
+	KNNImage(const Mat& inputImg, int _width, int _height) : width(_width), height(_height), Mat(_height, _width, CV_8UC1, Scalar(0)) {
 
-        for (int y = 0; y < img.rows; y++) {
-            for (int x = 0; x < img.cols; x++) {
+        auto start = high_resolution_clock::now();
 
-                Vec3b bgrpixle = img.at<Vec3b>(y, x);
+        PreProcess_Serial(inputImg);
 
-                uchar gray_value = (uchar)(0.114 * bgrpixle[0] + 0.587 * bgrpixle[1] + 0.299 * bgrpixle[2]);
+        auto stop = high_resolution_clock::now();
 
-                int xd = (int)(x * newImgScaleX);
-                int yd = (int)(y * newImgScaleY);
+        cout << "Serial time:" << duration_cast<microseconds>(stop - start).count() << endl;
 
-                if (xd >= width || yd >= height) {
-                    int i = 0;
-                }
+        start = high_resolution_clock::now();
 
-                this->at<uchar>(yd, xd) = gray_value;
-            }
-        }
+        PreProcess_Parallel(inputImg);
+
+        stop = high_resolution_clock::now();
+
+        cout << "Parallel time:" << duration_cast<microseconds>(stop - start).count() << endl;
 	}
+
+    void PreProcess_Serial(const Mat& img) {
+
+        const double scaleX = (double)img.size().width / width;
+        const double scaleY = (double)img.size().height / height;
+
+
+        for (unsigned i = 0; i < height * width; i++) {
+
+            int y = (i / width) * scaleY;
+            int x = (i % width) * scaleX;
+
+            Vec3b bgrpixle = img.at<Vec3b>(y, x);
+
+            int value_b = bgrpixle[0];
+            int value_g = bgrpixle[1];
+            int value_r = bgrpixle[2];
+
+            uchar gray_value = (uchar)(0.114 * value_b + 0.587 * value_g + 0.299 * value_r);
+
+            this->data[i] = gray_value;
+        }
+    }
+
+    void PreProcess_Parallel(const Mat& img) {
+
+        const double scaleX = (double)img.size().width / width;
+        const double scaleY = (double)img.size().height / height;
+
+        #pragma omp parallel for
+        for (unsigned i = 0; i < height * width; i++) {
+
+            int y = (i / width) * scaleY;
+            int x = (i % width) * scaleX;
+
+            Vec3b bgrpixle = img.at<Vec3b>(y, x);
+
+            int value_b = bgrpixle[0];
+            int value_g = bgrpixle[1];
+            int value_r = bgrpixle[2];
+
+            uchar gray_value = (uchar)(0.114 * value_b + 0.587 * value_g + 0.299 * value_r);
+
+            this->data[i] = gray_value;
+        }
+    }
 
     /*
     * Distance = sqrt(Sum((In-Jn)^2))
