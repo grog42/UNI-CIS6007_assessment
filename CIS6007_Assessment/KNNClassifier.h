@@ -1,12 +1,11 @@
 #pragma once
 #include <vector>
-#include <mutex>
-#include <opencv2/opencv.hpp>
 #include <string>
 #include <iostream>
 #include <filesystem>
 #include <tuple>
-#include <stack>
+#include <future>
+#include <execution>
 
 #include "KNNImage.h"
 
@@ -25,67 +24,71 @@ class KNNClassifier
 	/*
 	* Vector stores path of image and assosiated label
 	*/
-	vector<tuple<KNNImage, string>> images;
+	vector<unique_ptr<KNNImage>> images;
 
-	mutex mu;
+	vector<int> indexList;
 
 public:
 
 	KNNClassifier(int _imageWidth, int _imageHeight) : imageWidth(_imageWidth), imageHeight(_imageHeight) {
-		LoadTrainData();
-	}
 
-	void LoadTrainData() {
+		auto dir = directory_iterator(IMAGES_FOLDER_PATH + "train");
+		
+		auto LoadImage = [&](string imgPath, string imgLable) {
+			Mat img = imread(imgPath);
 
-		for (const auto& folderName : directory_iterator(IMAGES_FOLDER_PATH + "train")) {
+			if (img.empty()) 
+				throw "";
+			
+
+			return make_unique<KNNImage>(KNNImage(img, imgLable, imageWidth, imageHeight));
+		};
+
+		vector<future<unique_ptr<KNNImage>>> tasks;
+
+		for (const auto& folderName : dir) {
 
 			string folderPath = folderName.path().u8string();
 			int trimLength = IMAGES_FOLDER_PATH.size() + 6;
 			string imgLable = folderPath.erase(0, trimLength);
 
-			for (const auto& imageName : directory_iterator(folderName.path())) {
+			for (const auto& imageName : directory_iterator(folderName)) {
 
-				const string imgPath = imageName.path().u8string();
+				string imgPath = imageName.path().u8string();
 
-				cout << imgLable << endl;
-
-				Mat img = imread(imgPath);
-
-				if (img.empty()) {
-
-					cout << "Image not found" << endl;
-					continue;
-				}
-
-				images.push_back(tuple<KNNImage, string>(KNNImage(img, imageWidth, imageHeight), imgLable));
+				tasks.push_back(async(launch::async, LoadImage, imgPath, imgLable));
 			}
+		}
+
+		for (int i = 0; i < tasks.size(); i++) {
+			images.push_back(tasks[i].get());
+			//Loads index to each image into a vector
+			indexList.push_back(i);
 		}
 	}
 
-	string Classify(const Mat& inputImg, int k) {
-
-		KNNImage img(inputImg, imageWidth, imageHeight);
+	string Classify(const KNNImage& inputImg, int k) {
 
 		vector<tuple<double, string>> distMap = vector<tuple<double, string>>(images.size());
 
-		//For each stored <image, label> tuple the distance to the inputed image is calculated
+		//For each stored image the distance to the inputImg is calculated
 		//The distance and lable are then added to a vector storing distances associated with labels
-		for (int i = 0; i < images.size(); i++)
-			distMap[i] = make_tuple(KNNImage::Dist(get<0>(images[i]), img), get<1>(images[i]));
-		
+		auto GetDistances = [&](int i) {
+			distMap[i] = make_tuple(images[i]->Dist_To_S(inputImg), images[i]->lable);
+		};
 
+		for_each(execution::seq, this->indexList.begin(), this->indexList.end(), GetDistances);
+		
 		//Tuples are sorted into asseding order based on distance
 		//The sort function automaticaly picks the first element of the tuple to order
 		sort(distMap.begin(), distMap.end());
 
-		
 		vector<string> closeLabes(k);
 
 		//The k closest labels are added to an array
 		for (int i = 0; i < k; i++) 
 			closeLabes[i] = get<1>(distMap[i]);
 		
-
 		int bestQuant = 0;
 		string bestLabel = closeLabes[0];
 
@@ -101,6 +104,10 @@ public:
 		}
 
 		return bestLabel;
+	}
+
+	~KNNClassifier() {
+		
 	}
 };
 

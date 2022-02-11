@@ -1,27 +1,6 @@
 ﻿  CIS6007_Assessment.cpp
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(54,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(56,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(57,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(77,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(79,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(80,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(43,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(95,14): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
-  KNNClassifier.cpp
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(54,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(56,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(57,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(77,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(79,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(80,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(43,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(95,14): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
-  KNNImage.cpp
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(54,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(56,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(57,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(77,32): warning C4018: '<': signed/unsigned mismatch
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(79,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(80,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-  Generating Code...
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(50,20): warning C4244: 'initializing': conversion from 'double' to 'uint', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNImage.h(51,20): warning C4244: 'initializing': conversion from 'double' to 'uint', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(52,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+E:\Documents\WorkSpace\CIS6007_Assessment\KNNClassifier.h(98,14): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
   CIS6007_Assessment.vcxproj -> E:\Documents\WorkSpace\CIS6007_Assessment\x64\Debug\CIS6007_Assessment.exe
