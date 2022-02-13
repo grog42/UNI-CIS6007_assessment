@@ -6,17 +6,17 @@
 #include <tuple>
 #include <future>
 #include <execution>
+#include <math.h>
 
 #include "KNNImage.h"
 
 using namespace std;
 using namespace cv;
-using std::filesystem::directory_iterator;
+namespace fs = filesystem;
 
 class KNNClassifier
 {
-
-	const string IMAGES_FOLDER_PATH = "E:\\Documents\\WorkSpace\\CIS6007_Assessment\\images\\";
+	const string dirPath;
 
 	int imageWidth;
 	int imageHeight;
@@ -30,9 +30,14 @@ class KNNClassifier
 
 public:
 
-	KNNClassifier(int _imageWidth, int _imageHeight) : imageWidth(_imageWidth), imageHeight(_imageHeight) {
+	KNNClassifier(int _imageWidth, int _imageHeight, string _dirPath) : imageWidth(_imageWidth), imageHeight(_imageHeight), dirPath(_dirPath) {
 
-		auto dir = directory_iterator(IMAGES_FOLDER_PATH + "train");
+		string trainDirPath = dirPath + "train";
+
+		if (!fs::exists(trainDirPath)) {
+			cout << "Dir not found" << endl;
+			throw "";
+		}
 		
 		auto LoadImage = [&](string imgPath, string imgLable) {
 			Mat img = imread(imgPath);
@@ -40,21 +45,25 @@ public:
 			if (img.empty()) 
 				throw "";
 			
-
 			return make_unique<KNNImage>(KNNImage(img, imgLable, imageWidth, imageHeight));
 		};
 
 		vector<future<unique_ptr<KNNImage>>> tasks;
 
-		for (const auto& folderName : dir) {
+		for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
 
 			string folderPath = folderName.path().u8string();
-			int trimLength = IMAGES_FOLDER_PATH.size() + 6;
+			int trimLength = dirPath.size() + 6;
 			string imgLable = folderPath.erase(0, trimLength);
 
-			for (const auto& imageName : directory_iterator(folderName)) {
+			for (const auto& imageName : fs::directory_iterator(folderName)) {
 
 				string imgPath = imageName.path().u8string();
+
+				if (!fs::exists(imgPath)) {
+					cout << "Image not found" << endl;
+					continue;
+				}
 
 				tasks.push_back(async(launch::async, LoadImage, imgPath, imgLable));
 			}
@@ -67,17 +76,36 @@ public:
 		}
 	}
 
-	string Classify(const KNNImage& inputImg, int k) {
+	string Classify(const Mat& _inputImg, int k) {
+
+		KNNImage inputImg(_inputImg, "", imageWidth, imageHeight);
 
 		vector<tuple<double, string>> distMap = vector<tuple<double, string>>(images.size());
 
 		//For each stored image the distance to the inputImg is calculated
 		//The distance and lable are then added to a vector storing distances associated with labels
-		auto GetDistances = [&](int i) {
-			distMap[i] = make_tuple(images[i]->Dist_To_S(inputImg), images[i]->lable);
+		const int depthNum = (log(images.size()) / log(2)) - 1;
+
+		function<void(int, int, int)> Partition = [&](int start, int end, int depth) {
+
+			if (depth > depthNum || depth == -1) {
+
+				for(int i = start; i < end; i++) {
+					distMap[i] = make_tuple(images[i]->Dist_To_P(inputImg), images[i]->lable);
+				}
+			}
+			else {
+				int mid = (start + end) / 2;
+
+				auto f1 = async(launch::async, Partition, start, mid, ++depth);
+				auto f2 = async(launch::async, Partition, mid, end, ++depth);
+
+				f1.wait();
+				f2.wait();
+			}
 		};
 
-		for_each(execution::seq, this->indexList.begin(), this->indexList.end(), GetDistances);
+		Partition(0, this->images.size(), 0);
 		
 		//Tuples are sorted into asseding order based on distance
 		//The sort function automaticaly picks the first element of the tuple to order

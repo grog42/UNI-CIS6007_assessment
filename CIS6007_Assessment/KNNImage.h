@@ -38,7 +38,8 @@ public:
     */
 	KNNImage(const Mat& inputImg, string lable, int _width, int _height): lable(lable), width(_width), height(_height), indexList(height* width), Mat(_height, _width, CV_8UC1, Scalar(0)) {
 
-        /*This is a range of varables which are pre loaded to save time during execution*/
+        //This is a range of shared resources which are pre loaded to save time during execution
+        //const is used to ensure the resources remain safe when accessed in parallel
         const double scaleX = (double)inputImg.size().width / width;
         const double scaleY = (double)inputImg.size().height / height;
         const uchar* imgData = (uchar*)inputImg.data;
@@ -91,8 +92,6 @@ public:
         if (this->height != img.height ||
             this->width != img.width) throw invalid_argument("Images must be the same size");
 
-        double sum = 0;
-
         const uchar* data_a = this->data;
         const uchar* data_b = img.data;
 
@@ -115,8 +114,6 @@ public:
         if (this->height != img.height ||
             this->width != img.width) throw invalid_argument("Images must be the same size");
 
-        double sum = 0;
-
         const uchar* data_a = this->data;
         const uchar* data_b = img.data;
 
@@ -134,7 +131,7 @@ public:
     }
 
     ~KNNImage() {
-        ~Mat();
+        //~Mat();
     }
 };
 
