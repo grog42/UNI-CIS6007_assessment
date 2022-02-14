@@ -5,9 +5,6 @@
 #include <opencv2/opencv.hpp>
 #include <execution>
 #include <chrono>
-#include <omp.h>
-#include <execution>
-using namespace std::execution;
 
 using namespace std;
 using namespace cv;
@@ -19,9 +16,6 @@ using namespace std::chrono;
 */
 class KNNImage : public Mat
 {
-    int width;
-    int height;
-
     /* A vector listing the 1d index of each pixle
     *  This is used to parse a pixles index to for_each functions 
     *  The index is used as it conveys position data 
@@ -36,7 +30,7 @@ public:
     * If constructed using an exsisting image, the image is converted to grayscale and scaled
     * This pre processing of the image makes it usable by the KNN algorythm
     */
-	KNNImage(const Mat& inputImg, string lable, int _width, int _height): lable(lable), width(_width), height(_height), indexList(height* width), Mat(_height, _width, CV_8UC1, Scalar(0)) {
+	KNNImage(const Mat& inputImg, string _lable, int width, int height, bool parallelMode = true): lable(_lable), indexList(height* width), Mat(height, width, CV_8UC1, Scalar(0)) {
 
         //This is a range of shared resources which are pre loaded to save time during execution
         //const is used to ensure the resources remain safe when accessed in parallel
@@ -44,7 +38,7 @@ public:
         const double scaleY = (double)inputImg.size().height / height;
         const uchar* imgData = (uchar*)inputImg.data;
         const uint nChannels = inputImg.channels();
-        const uint inputImgWidth = inputImg.size().width;
+        const uint inputImgWidth = inputImg.cols;
 
         //Loads index to each pixle into a vector
         for (int i = 0; i < indexList.size(); i++)
@@ -65,20 +59,10 @@ public:
             this->data[i] = (uchar)(0.114 * value_b + 0.587 * value_g + 0.299 * value_r);
         };
         
-        
-        /*
-        auto start = high_resolution_clock::now();
-        for_each(execution::seq, indexList.begin(), indexList.end(), ProcessPixle);
-        auto stop = high_resolution_clock::now();
-
-        cout << "Serial time:" << duration_cast<microseconds>(stop - start).count() << endl;
-        */
-
-        auto start = high_resolution_clock::now();
-        for_each(execution::par, indexList.begin(), indexList.end(), ProcessPixle);
-        auto stop = high_resolution_clock::now();
-
-        cout << "Parallel time:" << duration_cast<microseconds>(stop - start).count() << endl;      
+        if (parallelMode) 
+            for_each(execution::par, indexList.begin(), indexList.end(), ProcessPixle);
+        else 
+            for_each(execution::seq, indexList.begin(), indexList.end(), ProcessPixle);       
 	}
 
     /*
@@ -86,11 +70,11 @@ public:
     * Where I is image one, J is image two and n represents the index of a pixle
     * Images must have the same width and height
     */
-    double Dist_To_S(const KNNImage& img) {
+    double DistTo(const KNNImage& img, bool parallelMode) {
 
         //Check that images are compatible
-        if (this->height != img.height ||
-            this->width != img.width) throw invalid_argument("Images must be the same size");
+        if (this->rows != img.rows ||
+            this->cols != img.cols) throw invalid_argument("Images must be the same size");
 
         const uchar* data_a = this->data;
         const uchar* data_b = img.data;
@@ -100,38 +84,18 @@ public:
         auto pixleDistance = [&](int i) {
             distances[i] = pow(data_a[i] - data_b[i], 2);
         };
+
+        if (parallelMode) {
+            for_each(execution::par, this->indexList.begin(), this->indexList.end(), pixleDistance);
+            return sqrt(reduce(execution::par, distances.begin(), distances.end()));
+        }
 
         for_each(execution::seq, this->indexList.begin(), this->indexList.end(), pixleDistance);
-
-        auto acc_result = reduce(execution::seq, distances.begin(), distances.end());
-
-        return sqrt(acc_result);
-    }
-
-    double Dist_To_P(const KNNImage& img) {
-
-        //Check that images are compatible
-        if (this->height != img.height ||
-            this->width != img.width) throw invalid_argument("Images must be the same size");
-
-        const uchar* data_a = this->data;
-        const uchar* data_b = img.data;
-
-        vector<double> distances(indexList.size());
-
-        auto pixleDistance = [&](int i) {
-            distances[i] = pow(data_a[i] - data_b[i], 2);
-        };
-
-        for_each(execution::par, this->indexList.begin(), this->indexList.end(), pixleDistance);
-
-        auto acc_result = reduce(execution::par, distances.begin(), distances.end());
-
-        return sqrt(acc_result);
+        return sqrt(reduce(execution::seq, distances.begin(), distances.end()));
     }
 
     ~KNNImage() {
-        //~Mat();
+        
     }
 };
 

@@ -3,10 +3,10 @@
 #include <string>
 #include <iostream>
 #include <filesystem>
-#include <tuple>
 #include <future>
 #include <execution>
 #include <math.h>
+#include <map>
 
 #include "KNNImage.h"
 
@@ -16,45 +16,35 @@ namespace fs = filesystem;
 
 class KNNClassifier
 {
-	const string dirPath;
-
+	//The width and height which images must be projected to for the distance algorythm to work
 	int imageWidth;
 	int imageHeight;
 
-	/*
-	* Vector stores path of image and assosiated label
-	*/
+	//Collection of images used to classify input images
 	vector<unique_ptr<KNNImage>> images;
 
-	vector<int> indexList;
+	bool parallelMode;
 
 public:
 
-	KNNClassifier(int _imageWidth, int _imageHeight, string _dirPath) : imageWidth(_imageWidth), imageHeight(_imageHeight), dirPath(_dirPath) {
+	KNNClassifier(int _imageWidth, int _imageHeight, const string dirPath, bool _parallelMode = true) : imageWidth(_imageWidth), imageHeight(_imageHeight), parallelMode(_parallelMode) {
 
 		string trainDirPath = dirPath + "train";
 
 		if (!fs::exists(trainDirPath)) {
 			cout << "Dir not found" << endl;
-			throw "";
+			return;
 		}
-		
-		auto LoadImage = [&](string imgPath, string imgLable) {
-			Mat img = imread(imgPath);
 
-			if (img.empty()) 
-				throw "";
-			
-			return make_unique<KNNImage>(KNNImage(img, imgLable, imageWidth, imageHeight));
-		};
-
+		//Stores tasks waiting to be rejoined
 		vector<future<unique_ptr<KNNImage>>> tasks;
+
+		launch mode = (parallelMode) ? launch::async : launch::deferred;
 
 		for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
 
 			string folderPath = folderName.path().u8string();
-			int trimLength = dirPath.size() + 6;
-			string imgLable = folderPath.erase(0, trimLength);
+			const string imgLable = folderPath.erase(0, trainDirPath.size());
 
 			for (const auto& imageName : fs::directory_iterator(folderName)) {
 
@@ -65,77 +55,136 @@ public:
 					continue;
 				}
 
-				tasks.push_back(async(launch::async, LoadImage, imgPath, imgLable));
+				//Forks off task to be rejoined later on
+				tasks.push_back(async(mode, [&](string imgPath, string imgLable) {
+						return make_unique<KNNImage>(KNNImage(imread(imgPath), imgLable, imageWidth, imageHeight, parallelMode));
+					}, imgPath, imgLable));
 			}
 		}
 
-		for (int i = 0; i < tasks.size(); i++) {
+		//Rejoin tasks and push image to images
+		for (int i = 0; i < tasks.size(); i++) 
 			images.push_back(tasks[i].get());
-			//Loads index to each image into a vector
-			indexList.push_back(i);
-		}
+		
 	}
 
-	string Classify(const Mat& _inputImg, int k) {
+	pair<string, float> Classify(const Mat& _inputImg, int k) {
 
-		KNNImage inputImg(_inputImg, "", imageWidth, imageHeight);
+		KNNImage inputImg(_inputImg, "", imageWidth, imageHeight, parallelMode);
 
-		vector<tuple<double, string>> distMap = vector<tuple<double, string>>(images.size());
+		//Create a vector which contatins the k closest labels
+		vector<pair<double, string>> distMap = (parallelMode) ? GetDistances_par(inputImg, k) : GetDistances_ser(inputImg, k);
 
-		//For each stored image the distance to the inputImg is calculated
-		//The distance and lable are then added to a vector storing distances associated with labels
-		const int depthNum = (log(images.size()) / log(2)) - 1;
+		//Create a Map which stores the quanitity of the k closest labels 
+		map<string, int> labelCounts;
 
-		function<void(int, int, int)> Partition = [&](int start, int end, int depth) {
+		for (int i = 0; i < k; i++) {
+			
+			string label = distMap[i].second;
 
-			if (depth > depthNum || depth == -1) {
+			//If the label is not in the map it is added, else the count is incremented
+			if (labelCounts.count(label) == 0)
+				labelCounts.insert({ label, 1 });
+			else
+				labelCounts[label]++;
+		}
+		
+		int bestQuant = 0;
+		string bestLabel = "";
 
-				for(int i = start; i < end; i++) {
-					distMap[i] = make_tuple(images[i]->Dist_To_P(inputImg), images[i]->lable);
-				}
+		//For loop finds the label with the higest quantity
+		for (const pair<string, int>& pair : labelCounts) {
+
+			if (bestQuant < pair.second) {
+				bestQuant = pair.second;
+				bestLabel = pair.first;
+			}
+		}
+
+		float confidence = 100 * (labelCounts[bestLabel] / (float)k);
+
+		return { bestLabel, confidence };
+	}
+
+	~KNNClassifier() {
+
+	}
+
+private:
+	//Iterates serialy through each image and calculates its distance
+	vector<pair<double, string>> GetDistances_ser(const KNNImage& inputImg, int k) {
+
+		vector<pair<double, string>> dMap(images.size());
+
+		for (int i = 0; i < dMap.size(); i++)
+			dMap[i] = { images[i]->DistTo(inputImg, false), images[i]->lable };
+
+		SortAndTrim(dMap, k);
+
+		return dMap;
+	}
+
+	/*
+	* Iterates through each image using an implementation of the divide and conquer parallel pattern
+	* K is used to set the max lenth of the array to return
+	*/
+	vector<pair<double, string>> GetDistances_par(const KNNImage& inputImg, int k) {
+
+		//Max number of times the number of images can be divided by 2
+		const int maxDepth = log(images.size()) / log(2);
+
+		/*After testing diffrent depths if was found that a depth of 4 offerd the highest level of speed up over the serial implmentation
+		This number seems to match the number of threads the system can allocate as 2^4 = 16 and the system has 16 threads*/
+		int targetDepth = 4;
+
+		//Prevents start - end range going below 1
+		if (targetDepth > maxDepth) {
+			targetDepth = maxDepth;
+		}
+
+		//Breaks down problem and distributes to new threads for asynchronous operation
+		function<vector<pair<double, string>>(int, int, int)> Partition = [&](int start, int end, int depth) {
+
+			if (depth <= 0) {
+
+				vector<pair<double, string>> dMap(end - start);
+
+				for (int i = start; i < end; i++)
+					dMap[i - start] = { images[i]->DistTo(inputImg, true), images[i]->lable };
+
+				return dMap;
 			}
 			else {
 				int mid = (start + end) / 2;
 
-				auto f1 = async(launch::async, Partition, start, mid, ++depth);
-				auto f2 = async(launch::async, Partition, mid, end, ++depth);
+				auto f1 = async(launch::async, Partition, start, mid, depth - 1);
+				auto f2 = async(launch::async, Partition, mid, end, depth - 1);
 
-				f1.wait();
-				f2.wait();
+				auto v1 = f1.get();
+				auto v2 = f2.get();
+
+				v1.insert(v1.begin(), v2.begin(), v2.end());
+
+				SortAndTrim(v1, k);
+
+				return v1;
 			}
 		};
 
-		Partition(0, this->images.size(), 0);
-		
-		//Tuples are sorted into asseding order based on distance
-		//The sort function automaticaly picks the first element of the tuple to order
-		sort(distMap.begin(), distMap.end());
-
-		vector<string> closeLabes(k);
-
-		//The k closest labels are added to an array
-		for (int i = 0; i < k; i++) 
-			closeLabes[i] = get<1>(distMap[i]);
-		
-		int bestQuant = 0;
-		string bestLabel = closeLabes[0];
-
-		//The number of times each label appears in the array is counted, the most common label is logged
-		for (const string& label : closeLabes) {
-
-			int quant = count(closeLabes.begin(), closeLabes.end(), label);
-
-			if (bestQuant < quant) {
-				bestQuant = quant;
-				bestLabel = label;
-			}
-		}
-
-		return bestLabel;
+		return Partition(0, this->images.size(), targetDepth);
 	}
 
-	~KNNClassifier() {
-		
+	/*
+	* v: Vector to be manipulated
+	* maxLength: the trimed size of the vector
+	*/
+	void SortAndTrim(vector<pair<double, string>>& v, int maxLength) {
+
+		sort(v.begin(), v.end());
+
+		if (v.size() > maxLength) {
+			v.resize(maxLength);
+		}
 	}
 };
 
