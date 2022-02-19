@@ -1,10 +1,8 @@
 #pragma once
 #include <vector>
 #include <string>
-//#include <iostream>
 #include <filesystem>
 #include <future>
-#include <execution>
 #include <math.h>
 #include <map>
 
@@ -14,19 +12,28 @@ using namespace std;
 using namespace cv;
 namespace fs = filesystem;
 
+/*
+* This class stores training images once they have been pre-processed it then provides functionality which 
+* allows inputted testing images to be classified. The KNNClassifier can be initialised in two modes parallel 
+* and serial, this controls how functions are executed.
+*/
 class KNNClassifier
 {
-	//The width and height which images must be projected to for the distance algorythm to work
+	//The width and height which images must be resized to make images comparable to eachother
 	int imageWidth;
 	int imageHeight;
 
 	//Collection of images used to classify input images
 	vector<shared_ptr<KNNImage>> images;
 
+	//Indicates if the classifer should use parallel or serial functions
 	bool parallelMode;
 
 public:
 
+	/*
+	* Loads all the training images from inputed directory path
+	*/
 	KNNClassifier(int _imageWidth, int _imageHeight, const string dirPath, bool _parallelMode = true) : imageWidth(_imageWidth), imageHeight(_imageHeight), parallelMode(_parallelMode) {
 
 		string trainDirPath = dirPath + "train";
@@ -38,39 +45,40 @@ public:
 		if (parallelMode) {
 			vector<future<shared_ptr<KNNImage>>> tasks;
 
-			auto LoadImage = [&](string imgPath, string imgLable) {
-				return make_shared<KNNImage>(imread(imgPath), imgLable, imageWidth, imageHeight, parallelMode);
+			auto LoadImage = [&](const fs::directory_entry& imagePath) {
+
+				//Get path string then extract lable from file name
+				string path = imagePath.path().u8string();
+				string imgLable = path.substr(trainDirPath.size() + 1, 3);
+
+				return make_shared<KNNImage>(imread(path), imgLable, imageWidth, imageHeight, true);
 			};
 
-			for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
-
-				//Use name of folder a image lable
-				const string imgLable = folderName.path().u8string().erase(0, trainDirPath.size() + 1);
-
-				for (const auto& imageName : fs::directory_iterator(folderName)) {
-
-					//Forks off task to be rejoined later on
-					tasks.push_back(async(LoadImage, imageName.path().u8string(), imgLable));
-				}
-			}
+			//Forks off task for each image to be rejoined later on
+			for (const auto& imagePath : fs::directory_iterator(trainDirPath)) 
+				tasks.push_back(async(LoadImage, imagePath));
+			
 
 			//Waits for tasks to finish to ensure synchronization 
 			images.reserve(tasks.size());
-			for (auto& t : tasks) {
+			for (auto& t : tasks) 
 				images.push_back(t.get());
-			}
+			
 		}
 		//Serial implementation
-		else for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
+		else for (const auto& imagePath : fs::directory_iterator(trainDirPath)) {
 
-				//Use name of folder a image lable
-				const string imgLable = folderName.path().u8string().erase(0, trainDirPath.size() + 1);
+			//Get path string then extract lable from file name
+			string path = imagePath.path().u8string();
+			string imgLable = path.substr(trainDirPath.size() + 1, 3);
 
-				for (const auto& imageName : fs::directory_iterator(folderName)) 
-					images.push_back(make_shared<KNNImage>(imread(imageName.path().u8string()), imgLable, imageWidth, imageHeight, parallelMode));
+			images.push_back(make_shared<KNNImage>(imread(path), imgLable, imageWidth, imageHeight, false));
 		}	
 	}
 
+	/*
+	* Takes an input image and calculates the mode label within the set of k closest input images
+	*/
 	pair<string, float> Classify(const Mat& _inputImg, int k) {
 
 		KNNImage inputImg(_inputImg, "", imageWidth, imageHeight, parallelMode);
@@ -79,34 +87,35 @@ public:
 		vector<pair<double, string>> distMap = (parallelMode) ? GetDistances_par(inputImg, k) : GetDistances_ser(inputImg, k);
 
 		//Create a Map which stores the quanitity of the k closest labels 
-		map<string, int> labelCounts;
+		map<string, int> labelQuantity;
 
 		for (int i = 0; i < k; i++) {
 			
 			string label = distMap[i].second;
 
 			//If the label is not in the map it is added, else the count is incremented
-			if (labelCounts.count(label) == 0)
-				labelCounts.insert({ label, 1 });
+			if (labelQuantity.count(label) == 0)
+				labelQuantity.insert({ label, 1 });
 			else
-				labelCounts[label]++;
+				labelQuantity[label]++;
 		}
 		
+		//Stores the current most common label
 		int bestQuant = 0;
-		string bestLabel = "";
+		string modeLabel = "";
 
 		//For loop finds the label with the higest quantity
-		for (const pair<string, int>& pair : labelCounts) {
+		for (const pair<string, int>& label : labelQuantity) {
 
-			if (bestQuant < pair.second) {
-				bestQuant = pair.second;
-				bestLabel = pair.first;
+			if (bestQuant < label.second) {
+				bestQuant = label.second;
+				modeLabel = label.first;
 			}
 		}
 
-		float confidence = 100 * (labelCounts[bestLabel] / (float)k);
+		float confidence = 100 * (labelQuantity[modeLabel] / (float)k);
 
-		return { bestLabel, confidence };
+		return { modeLabel, confidence };
 	}
 
 	~KNNClassifier() {

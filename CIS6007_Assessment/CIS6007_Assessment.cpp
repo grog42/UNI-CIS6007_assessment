@@ -9,63 +9,46 @@
 
 using namespace std;
 using namespace cv;
+using namespace std::chrono;
 namespace fs = filesystem;
 
-const int testWidth = 200;
-const int testHeight = 200;
-
-vector<pair<string, string>> LoadTestImage(string dirPath) {
-
-    if (!fs::exists(dirPath))
-        throw exception("Image directory not found");
-
-    string label;
-
-    cout << "Please enter the images lable" << endl;
-    cin >> label;
-
-    return { {dirPath, label} };
-}
-
-vector<pair<string, string>> LoadTestImages(string dirPath) {
+vector<string> LoadTestImages(string dirPath) {
 
 	string trainDirPath = dirPath + "test";
 
 	if (!fs::exists(trainDirPath)) 
         throw exception("Image directory not found");
 	
-    vector<pair<string, string>> testImages;
+    vector<string> testImages;
 
-	for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
+	for (const auto& imgPath : fs::directory_iterator(trainDirPath)) {
 
-        //Use name of folder a image lable
-		const string imgLable = folderName.path().u8string().erase(0, trainDirPath.size() + 1);
+        string path = imgPath.path().u8string();
 
-		for (const auto& imageName : fs::directory_iterator(folderName)) {
+        if (!fs::exists(path))
+            throw exception("Image directory not found");
 
-			string imgPath = imageName.path().u8string();
-            testImages.push_back({ imgPath , imgLable});
-		}
+        testImages.push_back(path);
 	}
 
     return testImages;
 }
 
-void TestSer(string dirPath, vector<pair<string, string>> testSet, int k) {
+void TestSer(string dirPath, vector<string> testSet, int k, int imgResWidth, int imgResHeight) {
 
     auto start = high_resolution_clock::now();
-    KNNClassifier classifier = KNNClassifier(testWidth, testHeight, dirPath, false);
+    KNNClassifier classifier = KNNClassifier(imgResWidth, imgResHeight, dirPath, false);
     auto stop = high_resolution_clock::now();
 
     cout << "Serial Image loading/pre-processing time:" << duration_cast<microseconds>(stop - start).count() << endl;
 
-    for (const auto& item : testSet) {
+    for (const auto& path : testSet) {
 
         start = high_resolution_clock::now();
 
-        Mat img = imread(item.first);
-        pair<string, float> result = classifier.Classify(img, k);
-        cout << "Class is:" << result.first << "  Expected: " << item.second << endl;
+        pair<string, float> result = classifier.Classify(imread(path), k);
+
+        cout << "Class is:" << result.first << endl;
         cout << "Confidence is:" << result.second << endl;
 
         stop = high_resolution_clock::now();
@@ -74,20 +57,21 @@ void TestSer(string dirPath, vector<pair<string, string>> testSet, int k) {
     
 }
 
-void TestPar(string dirPath, vector<pair<string, string>> testSet, int k) {
+void TestPar(string dirPath, vector<string> testSet, int k, int imgResWidth, int imgResHeight) {
 
     auto start = high_resolution_clock::now();
-    KNNClassifier classifier = KNNClassifier(testWidth, testHeight, dirPath, true);
+    KNNClassifier classifier = KNNClassifier(imgResWidth, imgResHeight, dirPath, true);
     auto stop = high_resolution_clock::now();
 
     cout << "Parallel Image loading/pre-processing time:" << duration_cast<microseconds>(stop - start).count() << endl;
 
-    for (const auto& item : testSet) {
+    for (const auto& path : testSet) {
 
         start = high_resolution_clock::now();
-        Mat img = imread(item.first);
-        pair<string, float> result = classifier.Classify(img, k);
-        cout << "Class is:" << result.first << "  Expected: " << item.second << endl;
+
+        pair<string, float> result = classifier.Classify(imread(path), k);
+
+        cout << "Class is:" << result.first << endl;
         cout << "Confidence is:" << result.second << endl;
 
         stop = high_resolution_clock::now();
@@ -99,17 +83,28 @@ int main(int argc, char** argv)
 {
     try {
         string dirPath = argv[1];
+        int imgResWidth = stoi(argv[2]);
+        int imgResHeight = stoi(argv[3]);
+
+        string input;
+        vector<string> testImages;
 
         if (!fs::exists(dirPath)) {
             throw exception("Image directory not found");
         }
 
-        string input;
-
         cout << "Enter path to test image or leave blank for the default set" << endl;
         getline(cin, input);
 
-        auto testImages = (input == "") ? LoadTestImages(dirPath) : LoadTestImage(input);
+        if (input == "") {
+            testImages = LoadTestImages(dirPath);
+        }        
+        else {
+            if (!fs::exists(input))
+                throw exception("Image not found");
+
+            testImages.push_back(input);
+        }
 
         cout << "Enter a value for K" << endl;
         getline(cin, input);
@@ -120,9 +115,9 @@ int main(int argc, char** argv)
             throw exception("K cannot be less than 1");
         }
 
-        TestPar(dirPath, testImages, k);
+        //TestPar(dirPath, testImages, k, imgResWidth, imgResHeight);
 
-        //TestSer(dirPath, testImages, k);
+        TestSer(dirPath, testImages, k, imgResWidth, imgResHeight);
     }
     catch (exception& e) {
         cout << e.what() << endl;

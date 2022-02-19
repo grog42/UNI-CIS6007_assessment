@@ -1,18 +1,14 @@
 #pragma once
 
-#include <math.h>
-#include <stdexcept>
 #include <opencv2/opencv.hpp>
 #include <execution>
-#include <chrono>
 
 using namespace std;
 using namespace cv;
-using namespace std::chrono;
 
 /*
-* A class which adds functionalty to the opencv Mat class
-* The added functions prepare the image for use in KNN classification
+* This class (which extends the OpenCV Mat class) pre-processes input images for use in classification, 
+* stores an image and its associated label, and provides functionality to calculated distances to other images.
 */
 class KNNImage : public Mat
 {
