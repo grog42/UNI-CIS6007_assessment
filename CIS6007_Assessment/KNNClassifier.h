@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
-#include <iostream>
+//#include <iostream>
 #include <filesystem>
 #include <future>
 #include <execution>
@@ -21,7 +21,7 @@ class KNNClassifier
 	int imageHeight;
 
 	//Collection of images used to classify input images
-	vector<unique_ptr<KNNImage>> images;
+	vector<shared_ptr<KNNImage>> images;
 
 	bool parallelMode;
 
@@ -31,41 +31,44 @@ public:
 
 		string trainDirPath = dirPath + "train";
 
-		if (!fs::exists(trainDirPath)) {
-			cout << "Dir not found" << endl;
-			return;
-		}
+		if (!fs::exists(trainDirPath)) 
+			throw exception("Training folder not found");
 
-		//Stores tasks waiting to be rejoined
-		vector<future<unique_ptr<KNNImage>>> tasks;
+		//Parallel implementation
+		if (parallelMode) {
+			vector<future<shared_ptr<KNNImage>>> tasks;
 
-		launch mode = (parallelMode) ? launch::async : launch::deferred;
+			auto LoadImage = [&](string imgPath, string imgLable) {
+				return make_shared<KNNImage>(imread(imgPath), imgLable, imageWidth, imageHeight, parallelMode);
+			};
 
-		for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
+			for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
 
-			string folderPath = folderName.path().u8string();
-			const string imgLable = folderPath.erase(0, trainDirPath.size());
+				//Use name of folder a image lable
+				const string imgLable = folderName.path().u8string().erase(0, trainDirPath.size() + 1);
 
-			for (const auto& imageName : fs::directory_iterator(folderName)) {
+				for (const auto& imageName : fs::directory_iterator(folderName)) {
 
-				string imgPath = imageName.path().u8string();
-
-				if (!fs::exists(imgPath)) {
-					cout << "Image not found" << endl;
-					continue;
+					//Forks off task to be rejoined later on
+					tasks.push_back(async(LoadImage, imageName.path().u8string(), imgLable));
 				}
+			}
 
-				//Forks off task to be rejoined later on
-				tasks.push_back(async(mode, [&](string imgPath, string imgLable) {
-						return make_unique<KNNImage>(KNNImage(imread(imgPath), imgLable, imageWidth, imageHeight, parallelMode));
-					}, imgPath, imgLable));
+			//Waits for tasks to finish to ensure synchronization 
+			images.reserve(tasks.size());
+			for (auto& t : tasks) {
+				images.push_back(t.get());
 			}
 		}
+		//Serial implementation
+		else for (const auto& folderName : fs::directory_iterator(trainDirPath)) {
 
-		//Rejoin tasks and push image to images
-		for (int i = 0; i < tasks.size(); i++) 
-			images.push_back(tasks[i].get());
-		
+				//Use name of folder a image lable
+				const string imgLable = folderName.path().u8string().erase(0, trainDirPath.size() + 1);
+
+				for (const auto& imageName : fs::directory_iterator(folderName)) 
+					images.push_back(make_shared<KNNImage>(imread(imageName.path().u8string()), imgLable, imageWidth, imageHeight, parallelMode));
+		}	
 	}
 
 	pair<string, float> Classify(const Mat& _inputImg, int k) {
@@ -135,12 +138,12 @@ private:
 
 		/*After testing diffrent depths if was found that a depth of 4 offerd the highest level of speed up over the serial implmentation
 		This number seems to match the number of threads the system can allocate as 2^4 = 16 and the system has 16 threads*/
-		int targetDepth = 4;
+		int targetDepth = log(thread::hardware_concurrency()) / log(2);
 
 		//Prevents start - end range going below 1
-		if (targetDepth > maxDepth) {
+		if (targetDepth > maxDepth) 
 			targetDepth = maxDepth;
-		}
+		
 
 		//Breaks down problem and distributes to new threads for asynchronous operation
 		function<vector<pair<double, string>>(int, int, int)> Partition = [&](int start, int end, int depth) {
@@ -157,11 +160,10 @@ private:
 			else {
 				int mid = (start + end) / 2;
 
-				auto f1 = async(launch::async, Partition, start, mid, depth - 1);
-				auto f2 = async(launch::async, Partition, mid, end, depth - 1);
+				auto f = async(launch::async, Partition, start, mid, depth - 1);
 
-				auto v1 = f1.get();
-				auto v2 = f2.get();
+				auto v1 = Partition(mid, end, depth - 1);
+				auto v2 = f.get();
 
 				v1.insert(v1.begin(), v2.begin(), v2.end());
 

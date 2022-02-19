@@ -74,7 +74,7 @@ public:
 
         //Check that images are compatible
         if (this->rows != img.rows ||
-            this->cols != img.cols) throw invalid_argument("Images must be the same size");
+            this->cols != img.cols) throw exception("Images must be the same size");
 
         const uchar* data_a = this->data;
         const uchar* data_b = img.data;
